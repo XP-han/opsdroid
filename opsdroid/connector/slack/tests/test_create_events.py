@@ -125,3 +125,33 @@ async def test_edit_message_user_name_not_found(connector, mock_api):
     event_creator = SlackEventCreator(connector=connector)
     message = await event_creator.edit_message({"message": {}}, None)
     assert not message
+
+
+@pytest.mark.anyio
+async def test_bot_message_without_bot_id(connector, mock_api):
+    event_creator = SlackEventCreator(connector=connector)
+    event = {
+        "type": "message",
+        "subtype": "bot_message",
+        "channel": "C01N9PM1D53",
+        "ts": "1613575038.002800",
+        "text": "This content can't be displayed.",
+    }
+    message = await event_creator.handle_bot_message(event, event["channel"])
+    assert not message
+
+
+@pytest.mark.anyio
+async def test_bot_message_with_other_bot_id(connector, mock_api):
+    event_creator = SlackEventCreator(connector=connector)
+    connector.known_bots["B01N9R657HB"] = {"id": "another-bot"}
+    event = {
+        "type": "message",
+        "subtype": "bot_message",
+        "channel": "C01N9PM1D53",
+        "ts": "1613575038.002800",
+        "text": "Hello from another bot.",
+        "bot_id": "B01N9R657HB",
+    }
+    message = await event_creator.handle_bot_message(event, event["channel"])
+    assert message.text == "Hello from another bot."
