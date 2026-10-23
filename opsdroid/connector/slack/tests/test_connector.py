@@ -391,6 +391,38 @@ async def test_search_history_messages_retries_non_rate_limit_error(connector):
 
 
 @pytest.mark.anyio
+async def test_search_history_messages_retry_after_defaults_to_30_seconds(connector):
+    """A 429 that omits Retry-After must fall back to Slack's 30 second default."""
+    response = SlackResponse(
+        client=None,
+        http_verb="GET",
+        req_args={},
+        api_url="/conversations.history",
+        status_code=429,
+        headers={},
+        data={"ok": False, "error": "ratelimited"},
+    )
+    conversations_history = AsyncMock(
+        side_effect=[
+            SlackApiError(message="Slack API request failed.", response=response),
+            {"ok": True, "messages": [{"ts": "1512085950.000216"}]},
+        ]
+    )
+    connector.slack_web_client.conversations_history = conversations_history
+
+    with patch(
+        "opsdroid.connector.slack.connector.asyncio.sleep", new_callable=AsyncMock
+    ) as sleep:
+        history = await connector.search_history_messages(
+            "C01N639ECTY", "1512085930.000000", "1512085980.000000"
+        )
+
+    assert history == [{"ts": "1512085950.000216"}]
+    assert conversations_history.await_count == 2
+    sleep.assert_awaited_once_with(30)
+
+
+@pytest.mark.anyio
 @pytest.mark.add_response(*CONVERSATIONS_LIST_LAST_PAGE)
 async def test_find_channel(connector, mock_api):
     connector.known_channels = {"general": {"name": "general", "id": "C012AB3CD"}}
