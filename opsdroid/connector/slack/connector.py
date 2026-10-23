@@ -370,6 +370,8 @@ class ConnectorSlack(Connector):
 
         returns:
             list of messages between the that timeframe
+            If all five retries fail, any messages retrieved before the failure
+            are returned.
 
         **Basic Usage Example in a Skill:**
 
@@ -388,27 +390,58 @@ class ConnectorSlack(Connector):
                     )
                     await message.respond(str(messages))
         """
-        messages = []
-        history = await self.slack_web_client.conversations_history(
-            channel=channel, oldest=start_time, latest=end_time, limit=limit
-        )
-        cursor = history.get("response_metadata", {}).get("next_cursor")
-
         if limit > 1000:
             _LOGGER.info(
                 "Grabbing message history from Slack API. This might take some time"
             )
 
-        while True:
-            messages += history["messages"]
+        messages = []
+        cursor = None
+        max_retries = 5
 
-            if cursor:
+        while max_retries:
+            try:
                 history = await self.slack_web_client.conversations_history(
-                    channel=channel, oldest=start_time, latest=end_time, cursor=cursor
+                    channel=channel,
+                    oldest=start_time,
+                    latest=end_time,
+                    limit=limit,
+                    cursor=cursor,
                 )
-                cursor = history.get("response_metadata", {}).get("next_cursor")
-            else:
+            except SlackApiError as error:
+                max_retries -= 1
+                if "ratelimited" in str(error):
+                    wait_time = float(error.response.headers.get("Retry-After", 30))
+                    if max_retries:
+                        _LOGGER.warning(
+                            _(
+                                f"Rate limit threshold reached. Retrying after {wait_time} seconds."
+                            )
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        _LOGGER.warning(
+                            "Unable to retrieve message history from Slack after "
+                            "reaching the retry limit."
+                        )
+                elif max_retries:
+                    _LOGGER.warning(
+                        "Unable to retrieve message history from Slack. "
+                        "Retrying with %s attempts remaining.",
+                        max_retries,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "Unable to retrieve message history from Slack after "
+                        "reaching the retry limit."
+                    )
+                continue
+
+            messages += history["messages"]
+            cursor = history.get("response_metadata", {}).get("next_cursor")
+            if not cursor:
                 break
+
         messages_count = len(messages)
         _LOGGER.debug("Grabbed a total of %s messages from Slack", messages_count)
 

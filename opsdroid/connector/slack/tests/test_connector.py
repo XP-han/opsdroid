@@ -2,7 +2,7 @@
 
 import logging
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 import pytest
 from opsdroid import events
 
@@ -47,6 +47,19 @@ CONVERSATIONS_SET_TOPIC = ("/conversations.setTopic", "POST", {"ok": True}, 200)
 PINS_ADD = ("/pins.add", "POST", {"ok": True}, 200)
 PINS_REMOVE = ("/pins.remove", "POST", {"ok": True}, 200)
 FILES_UPLOAD = ("/files.upload", "POST", {"ok": True}, 200)
+
+
+def _make_slack_api_error(error="ratelimited", retry_after=0.1):
+    response = SlackResponse(
+        client=None,
+        http_verb="GET",
+        req_args={},
+        api_url="/conversations.history",
+        status_code=429,
+        headers={"Retry-After": retry_after},
+        data={"ok": False, "error": error},
+    )
+    return SlackApiError(message="Slack API request failed.", response=response)
 
 
 @pytest.fixture
@@ -268,6 +281,113 @@ async def test_search_history_messages_more_than_one_api_request(connector, mock
     assert mock_api.called("/conversations.history")
     assert len(history) == 4
     assert isinstance(history, list)
+
+
+@pytest.mark.anyio
+async def test_search_history_messages_retries_initial_rate_limit(connector):
+    expected_messages = [{"ts": "1512085950.000216"}]
+    conversations_history = AsyncMock(
+        side_effect=[
+            _make_slack_api_error(),
+            {"ok": True, "messages": expected_messages},
+        ]
+    )
+    connector.slack_web_client.conversations_history = conversations_history
+
+    with patch(
+        "opsdroid.connector.slack.connector.asyncio.sleep", new_callable=AsyncMock
+    ) as sleep:
+        history = await connector.search_history_messages(
+            "C01N639ECTY", "1512085930.000000", "1512085980.000000"
+        )
+
+    assert history == expected_messages
+    assert conversations_history.await_count == 2
+    sleep.assert_awaited_once_with(0.1)
+
+
+@pytest.mark.anyio
+async def test_search_history_messages_retries_same_cursor(connector):
+    conversations_history = AsyncMock(
+        side_effect=[
+            {
+                "ok": True,
+                "messages": [{"ts": "1512085950.000216"}],
+                "response_metadata": {"next_cursor": "next-page"},
+            },
+            _make_slack_api_error(),
+            {
+                "ok": True,
+                "messages": [{"ts": "1512085960.000217"}],
+                "response_metadata": {"next_cursor": ""},
+            },
+        ]
+    )
+    connector.slack_web_client.conversations_history = conversations_history
+
+    with patch(
+        "opsdroid.connector.slack.connector.asyncio.sleep", new_callable=AsyncMock
+    ):
+        history = await connector.search_history_messages(
+            "C01N639ECTY", "1512085930.000000", "1512085980.000000"
+        )
+
+    assert [message["ts"] for message in history] == [
+        "1512085950.000216",
+        "1512085960.000217",
+    ]
+    assert conversations_history.await_args_list[1].kwargs["cursor"] == "next-page"
+    assert conversations_history.await_args_list[2].kwargs["cursor"] == "next-page"
+
+
+@pytest.mark.anyio
+async def test_search_history_messages_returns_partial_history_after_retry_limit(
+    connector,
+):
+    conversations_history = AsyncMock(
+        side_effect=[
+            {
+                "ok": True,
+                "messages": [{"ts": "1512085950.000216"}],
+                "response_metadata": {"next_cursor": "next-page"},
+            },
+            *[_make_slack_api_error() for _ in range(5)],
+        ]
+    )
+    connector.slack_web_client.conversations_history = conversations_history
+
+    with patch(
+        "opsdroid.connector.slack.connector.asyncio.sleep", new_callable=AsyncMock
+    ) as sleep:
+        history = await connector.search_history_messages(
+            "C01N639ECTY", "1512085930.000000", "1512085980.000000"
+        )
+
+    assert history == [{"ts": "1512085950.000216"}]
+    assert conversations_history.await_count == 6
+    assert sleep.await_count == 4
+
+
+@pytest.mark.anyio
+async def test_search_history_messages_retries_non_rate_limit_error(connector):
+    conversations_history = AsyncMock(
+        side_effect=[
+            _make_slack_api_error(error="internal_error"),
+            {"ok": True, "messages": []},
+        ]
+    )
+    connector.slack_web_client.conversations_history = conversations_history
+
+    with patch(
+        "opsdroid.connector.slack.connector.asyncio.sleep", new_callable=AsyncMock
+    ) as sleep:
+        history = await connector.search_history_messages(
+            "C01N639ECTY", "1512085930.000000", "1512085980.000000"
+        )
+
+    assert history == []
+    assert conversations_history.await_count == 2
+    sleep.assert_not_awaited()
 
 
 @pytest.mark.anyio
