@@ -15,7 +15,7 @@ import tempfile
 import urllib.request
 from collections.abc import Mapping
 
-from pkg_resources import iter_entry_points
+from importlib.metadata import entry_points as iter_entry_points
 
 from opsdroid.configuration import validate_configuration
 from opsdroid.const import (
