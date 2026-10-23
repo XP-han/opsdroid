@@ -82,10 +82,10 @@ Either is fine. Pick one and be consistent; do not do both.
 
 I compared the two APIs directly with a real third-party fixture distribution
 installed (see `../experiments/compare_entrypoint_api.py` and
-`../experiments/ENTRYPOINT-API-COMPARISON.md`). Summary of what opsdroid depends on:
+`07-entrypoint-api-comparison.md`). Summary of what opsdroid depends on:
 
 Measured, not assumed: the full side-by-side run is in
-[`../experiments/ENTRYPOINT-API-COMPARISON.md`](../experiments/ENTRYPOINT-API-COMPARISON.md),
+[`07-entrypoint-api-comparison.md`](07-entrypoint-api-comparison.md),
 produced by `../experiments/compare_entrypoint_api.py` with three real fixture
 distributions installed (including one that deliberately registers a duplicate
 entry-point name).

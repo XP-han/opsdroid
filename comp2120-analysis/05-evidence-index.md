@@ -1,7 +1,7 @@
 # Evidence index
 
 **Deliverable 5.** Every claim in [`03-root-cause.md`](03-root-cause.md),
-[`07-report-draft.md`](07-report-draft.md) and
+the group report draft (held by the group, not in this repository) and
 [`04-fix-interface-contract.md`](04-fix-interface-contract.md) traces back to an entry
 here. Nothing in this work package is asserted without a recorded transcript.
 
@@ -208,7 +208,7 @@ none, and both mistakes are easy to repeat.
 
 ## 3. Entry-point API comparison
 
-`experiments/ENTRYPOINT-API-COMPARISON.md` (regenerate with
+`07-entrypoint-api-comparison.md` (regenerate with
 `experiments/compare_entrypoint_api.py` in a venv that has setuptools < 82 plus the
 fixtures). Headline results:
 

@@ -40,6 +40,8 @@ analysis · **Part of:** COMP6120 Assignment 5 group work
 | `04-fix-interface-contract.md` | The seven behaviours a correct fix must preserve, plus two traps |
 | `05-evidence-index.md` | Provenance for every claim: logs, transcripts, sources |
 | `06-contribution-statement.md` | First-person account of this work package and its handovers |
+| `07-entrypoint-api-comparison.md` | Measured differences between `pkg_resources` and `importlib.metadata` entry-point APIs |
+| `10-implementation-review.md` | Review of the independent upstream implementation against the contract |
 
 ## Reproducing the failure
 

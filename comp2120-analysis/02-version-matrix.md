@@ -162,7 +162,7 @@ Figure: `../experiments/figures/fig3-unboundlocalerror.png`
 5. **What entry-point behaviour must be preserved by `importlib.metadata`?** Group
    filtering, `.name`, `.load()` returning the same object, and the
    `{ep.name: ep}` mapping — all measured as equivalent in
-   `../experiments/ENTRYPOINT-API-COMPARISON.md`. Two things are *not* equivalent and
+   `07-entrypoint-api-comparison.md`. Two things are *not* equivalent and
    need conscious handling: the `dist=` constructor used by the unit test (must be
    rewritten) and the visibility of directories appended to `sys.path` after
    `pkg_resources` was first imported (`importlib.metadata` sees them,
