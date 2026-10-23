@@ -15,7 +15,7 @@ import tempfile
 import urllib.request
 from collections.abc import Mapping
 
-from importlib.metadata import entry_points as iter_entry_points
+from pkg_resources import iter_entry_points
 
 from opsdroid.configuration import validate_configuration
 from opsdroid.const import (
@@ -124,7 +124,7 @@ class Loader:
         _LOGGER.error(
             _("Failed to load %s: %s."), config["type"], config["module_path"]
         )
-        
+        return None
 
     @classmethod
     def check_cache(cls, config):
@@ -313,7 +313,7 @@ class Loader:
                 intents = intent_file_handle.read()
                 return intents
         else:
-            
+            return None
 
     def setup_modules_directory(self, config):
         """Create and configure the modules directory.
@@ -569,7 +569,7 @@ class Loader:
                     "'no-dep' set in configuration, skipping the install of dependencies."
                 )
             )
-            
+            return None
 
         if os.path.isfile(os.path.join(config["install_path"], "requirements.txt")):
             self.pip_install_deps(
@@ -578,7 +578,7 @@ class Loader:
             return True
 
         _LOGGER.debug(_("Couldn't find the file requirements.txt, skipping."))
-        
+        return None
 
     def _install_git_module(self, config):
         """Install a module from a git repository.
