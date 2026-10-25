@@ -241,7 +241,7 @@ class TestLoader(unittest.TestCase):
         loader.modules_directory = self._tmp_dir
 
         with mock.patch(
-            "opsdroid.loader.iter_entry_points", return_value=(ep,)
+            "opsdroid.loader.entry_points", return_value=(ep,)
         ) as discover:
             loaded = loader._load_modules("database", {"myep": {}})
 
