@@ -65,7 +65,8 @@ class SlackEventCreator(events.EventCreator):
     async def handle_bot_message(self, event, channel):
         """Check that a bot message is opsdroid if not create the message"""
 
-        if event["bot_id"] != self.connector.bot_id:
+        bot_id = event.get("bot_id")
+        if bot_id is not None and bot_id != self.connector.bot_id:
             return await self.create_message(event, channel)
 
     async def create_message(self, event, channel, isbot=False):
