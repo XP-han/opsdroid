@@ -6,7 +6,7 @@ import tempfile
 import contextlib
 import unittest
 import unittest.mock as mock
-from importlib.metadata import EntryPoint
+from importlib.metadata import EntryPoint, EntryPoints
 from types import ModuleType
 
 from opsdroid.core import OpsDroid
@@ -240,15 +240,50 @@ class TestLoader(unittest.TestCase):
         _, loader = self.setup()
         loader.modules_directory = self._tmp_dir
 
-        with mock.patch(
-            "opsdroid.loader.entry_points", return_value=(ep,)
-        ) as discover:
+        with mock.patch("opsdroid.loader.entry_points", return_value=(ep,)) as discover:
             loaded = loader._load_modules("database", {"myep": {}})
 
         discover.assert_called_once_with(group="opsdroid_databases")
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["config"]["name"], "myep")
         self.assertIs(loaded[0]["module"], os.path)
+
+    def test_load_modules_without_entrypoints(self):
+        """Return no modules when no entry points or modules are configured."""
+        _, loader = self.setup()
+        loader.modules_directory = self._tmp_dir
+
+        with mock.patch("opsdroid.loader.entry_points", return_value=()) as discover:
+            loaded = loader._load_modules("database", {})
+
+        self.assertEqual(loaded, [])
+        discover.assert_called_once_with(group="opsdroid_databases")
+
+    def test_load_modules_ignores_entrypoints_from_other_groups(self):
+        """Keep same-named database and skill entry points isolated."""
+        database_ep = EntryPoint("shared", "os.path", "opsdroid_databases")
+        skill_ep = EntryPoint("shared", "os", "opsdroid_skills")
+        installed_entry_points = EntryPoints((database_ep, skill_ep))
+        _, loader = self.setup()
+        loader.modules_directory = self._tmp_dir
+
+        def discover_entry_points(**selection):
+            if selection:
+                return installed_entry_points.select(**selection)
+            return {
+                database_ep.group: EntryPoints((database_ep,)),
+                skill_ep.group: EntryPoints((skill_ep,)),
+            }
+
+        with mock.patch(
+            "opsdroid.loader.entry_points", side_effect=discover_entry_points
+        ) as discover:
+            loaded = loader._load_modules("database", {"shared": {}})
+
+        self.assertEqual(len(loaded), 1)
+        self.assertIs(loaded[0]["module"], os.path)
+        self.assertIs(loaded[0]["config"]["entrypoint"], database_ep)
+        discover.assert_called_once_with(group="opsdroid_databases")
 
     def test_loader_import_without_pkg_resources(self):
         code = (
